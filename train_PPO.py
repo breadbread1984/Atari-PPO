@@ -14,7 +14,7 @@ from caffe2.proto import caffe2_pb2;
 from caffe2.python.optimizer import build_sgd;
 from ale_python_interface import ALEInterface;
 
-class DQN(object):
+class PPO(object):
         # class members
         #
         # predict_net: predict network
@@ -222,7 +222,7 @@ class DQN(object):
 def main():
         device = core.DeviceOption(caffe2_pb2.CUDA);
         with core.DeviceScope(device):
-                model = DQN();
+                model = PPO();
                 model.CreateModel();
                 model.TrainModel();
 
