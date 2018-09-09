@@ -1,6 +1,6 @@
 # Atari-PPO
 
-This project implements Policy Proximity Optimization algorithm on Arcade Learning Environment.
+This project implements Policy Proximity Optimization algorithm on Arcade Learning Environment with Caffe2.
 
 ### how to train
 
