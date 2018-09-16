@@ -211,7 +211,7 @@ class PPO(object):
                 for param in self.model.params:
                         blob = workspace.FetchBlob(param);
                         shape = blob.shape;
-                        op = core.CreateOperator('GivenTensorFill',[],[param],arg = [utils.MakeArgument('shape',shape),utils.MakeArgument('value',blob)]);
+                        op = core.CreateOperator('GivenTensorFill',[],[param],arg = [utils.MakeArgument('shape',shape),utils.MakeArgument('values',blob)]);
                         init_net.op.extend([op]);
                 init_net.op.extend([core.CreateOperator('ConstantFill',[],['data'],shape = (self.batch_size,4,84,84))]);
                 init_net.op.extend([core.CreateOperator('ConstantFill',[],['policy_label'],shape = (self.batch_size,self.legal_actions.shape[0]))]);
