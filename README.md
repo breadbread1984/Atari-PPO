@@ -7,10 +7,18 @@ This project implements Policy Proximity Optimization algorithm on Arcade Learni
 train the model with the following command
 
 ```Python
-./train_PPO.py
+./train_ppo.py
 ```
 
 The trained model will be under model directory
+
+### how to test
+
+test the model with the following command
+
+```Python
+./test_ppo.py
+```
 
 ### to do
 
