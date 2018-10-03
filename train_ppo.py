@@ -156,9 +156,7 @@ class PPO(object):
 
         def TrainModel(self):
                 #start training
-                count = 0;
-                while count >= 0:
-                        print("training iteration ",count);
+                while True:
                         dataset = [];
                         print("1) sample 1000 episodes");
                         for i in range(300):
@@ -197,10 +195,8 @@ class PPO(object):
                                 workspace.FeedBlob("train_value",np.array([0],dtype = np.float32));
                                 workspace.FeedBlob("train_policy",np.array([1],dtype = np.float32));
                                 workspace.RunNet(self.model.name);
-                        #counter
-                        count = count + 1;
-                        if 0 == count % 1000:
-                                self.SaveModel('model/init.pb','model/predict.pb');
+                        #save model
+                        self.SaveModel('model/init.pb','model/predict.pb');
 
         def SaveModel(self,init_path,pred_path):
                 #output predict net

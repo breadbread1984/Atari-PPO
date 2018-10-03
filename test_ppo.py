@@ -35,7 +35,7 @@ def main():
                         frames.pop(0);
                         data = np.array(frames);
                         data = np.expand_dims(data,axis = 0);
-                        [value,softmax] = p.run({"data":data},["value","softmax"]);
+                        [value,softmax] = p.run({"data":data});
                         #apply actiono
                         for i in range(3): ale.act(legal_actions[np.softmax(softmax,axis = 1)][0]);
                         #show status
