@@ -137,11 +137,11 @@ class VPG(object):
                     avg_policy_loss.reset_states();
                     avg_value_loss.reset_states();
                 # train policy
-                policy_grads = tape.gradient(policy_loss,self.policyModel.variables);
-                optimizer.apply_gradients(zip(policy_grads,model.variables), global_step = tf.train.get_global_step());
+                policy_grads = tape.gradient(policy_loss,self.policyModel.trainable_variables);
+                optimizer.apply_gradients(zip(policy_grads,model.trainable_variables));
                 # train value
-                value_grads = tape.gradient(value_loss,self.policyModel.variables);
-                optimizer.apply_gradients(zip(value_grads,model.variables), global_step = tf.train.get_global_step());
+                value_grads = tape.gradient(value_loss,self.policyModel.trainable_variables);
+                optimizer.apply_gradients(zip(value_grads,model.trainable_variables));
             # save model every episode
             checkpoint.save(os.path.join('checkpoints','ckpt'));
         # save final model
