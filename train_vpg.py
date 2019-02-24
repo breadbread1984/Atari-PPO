@@ -103,7 +103,7 @@ class VPG(object):
             status = status[1:];
         total_reward = 0;
         for status in reversed(trajectory):
-            total_reward = status[2] + self.gamma_ + total_reward;
+            total_reward = status[2] + self.gamma_ * total_reward;
         return trajectory, total_reward;
     
     def train(self, loop_time = 1000):
@@ -117,7 +117,7 @@ class VPG(object):
             trajectory, total_reward = self.PlayOneEpisode();
             avg_policy_loss = tf.keras.metrics.Mean(name = 'policy loss', dtype = tf.float32);
             avg_value_loss = tf.keras.metrics.Mean(name = 'value loss', dtype = tf.float32);
-            for status in reversed(trajectory):
+            for status in trajectory:
                 # policy loss
                 with tf.GradientTape() as tape:
                     Vt, logPt = self.policyModel(self.status2tensor(status[0]));
@@ -137,8 +137,8 @@ class VPG(object):
                     avg_policy_loss.reset_states();
                     avg_value_loss.reset_states();
                 # train policy and value
-                grads = tape.gradient(policy_loss + value_loss,self.policyModel.trainable_variables);
-                optimizer.apply_gradients(zip(grads,self.policyModel.trainable_variables));
+                grads = tape.gradient(policy_loss + value_loss,self.policyModel.variables);
+                optimizer.apply_gradients(zip(grads,self.policyModel.variables));
             # save model every episode
             checkpoint.save(os.path.join('checkpoints','ckpt'));
         # save final model
