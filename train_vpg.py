@@ -119,7 +119,7 @@ class VPG(object):
                 # policy loss
                 with tf.GradientTape() as tape:
                     Vt, logPt = self.policyModel(self.status2tensor(status[0]));
-                    Vtp1, logPtp1 = self.policyModel(self.status2tensor(status[4]));
+                    Vtp1, logPtp1 = self.policyModel(self.status2tensor(status[3]));
                     action_mask = tf.one_hot(status[1],len(self.legal_actions));
                     log_probs = tf.math.reduce_sum(action_mask * logPt, axis = 1);
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
