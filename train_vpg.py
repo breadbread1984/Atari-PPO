@@ -104,14 +104,14 @@ class VPG(object):
     
     def train(self, loop_time = 1000):
         
-        optimizer = tf.train.AdamOptimizer(1e-4);
+        optimizer = tf.compat.v1.train.AdamOptimizer(1e-4);
         # setup checkpoint and log utils
-        checkpoint = tf.train.Checkpoint(model = self.policyModel, optimizer = optimizer, optimizer_step = tf.train.get_or_create_global_step());
+        checkpoint = tf.train.Checkpoint(model = self.policyModel, optimizer = optimizer, optimizer_step = tf.compat.v1.train.get_or_create_global_step());
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints'));
         log = tf.summary.create_file_writer('checkpoints');
         log.set_as_default();
         for i in range(loop_time):
-            trajectory = PlayOneEpisode();
+            trajectory = self.PlayOneEpisode();
             total_reward = 0;
             for status in reversed(trajectory):
                 # update total reward
@@ -130,16 +130,17 @@ class VPG(object):
                 # train policy
                 grads = tape.gradient(loss,self.policyModel.variables);
                 optimizer.apply_gradients(zip(grads,model.variables), global_step = tf.train.get_global_step());
-            # value loss
-            with tf.GradientTape() as tape:
-                Vt, logPt = self.policyModel(self.status2tensor(staus[0]));
-                loss = tf.math.squared_difference(Vt, total_reward);
-            # write value loss
-            with tf.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
-                tf.contrib.summary.scalar('value loss',loss);
-            # train value
-            grads = tape.gradient(loss,self.policyModel.variables);
-            optimizer.apply_gradients(zip(grads,model.variables), global_step = tf.train.get_global_step());
+            for status in trajectory:
+                # value loss
+                with tf.GradientTape() as tape:
+                    Vt, logPt = self.policyModel(self.status2tensor(status[0]));
+                    loss = tf.math.squared_difference(Vt, total_reward);
+                # write value loss
+                with tf.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
+                    tf.contrib.summary.scalar('value loss',loss);
+                # train value
+                grads = tape.gradient(loss,self.policyModel.variables);
+                optimizer.apply_gradients(zip(grads,model.variables), global_step = tf.train.get_global_step());
             # save model every episode
             checkpoint.save(os.path.join('checkpoints','ckpt'));
         # save final model
