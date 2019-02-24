@@ -126,8 +126,8 @@ class VPG(object):
                     policy_loss = -tf.reduce_mean(log_probs * advantage);
                     value_loss = tf.math.squared_difference(Vt, total_reward);
                 # write loss to summary
-                tf.compat.summary.scalar('policy loss',policy_loss);
-                tf.compat.summary.scalar('value loss',value_loss);
+                tf.summary.scalar('policy loss',policy_loss);
+                tf.summary.scalar('value loss',value_loss);
                 # train policy
                 policy_grads = tape.gradient(policy_loss,self.policyModel.variables);
                 optimizer.apply_gradients(zip(policy_grads,model.variables), global_step = tf.train.get_global_step());
