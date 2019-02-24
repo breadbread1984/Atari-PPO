@@ -136,12 +136,9 @@ class VPG(object):
                         summary_ops_v2.scalar('value loss',avg_value_loss.result(), step = optimizer.iterations);
                     avg_policy_loss.reset_states();
                     avg_value_loss.reset_states();
-                # train policy
-                policy_grads = tape.gradient(policy_loss,self.policyModel.trainable_variables);
-                optimizer.apply_gradients(zip(policy_grads,self.policyModel.trainable_variables));
-                # train value
-                value_grads = tape.gradient(value_loss,self.policyModel.trainable_variables);
-                optimizer.apply_gradients(zip(value_grads,self.policyModel.trainable_variables));
+                # train policy and value
+                grads = tape.gradient(policy_loss + value_loss,self.policyModel.trainable_variables);
+                optimizer.apply_gradients(zip(grads,self.policyModel.trainable_variables));
             # save model every episode
             checkpoint.save(os.path.join('checkpoints','ckpt'));
         # save final model
