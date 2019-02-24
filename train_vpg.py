@@ -4,6 +4,7 @@ import os;
 import numpy as np;
 import cv2;
 import tensorflow as tf;
+from tensorflow.python.ops import summary_ops_v2;
 from atari_py import ALEInterface;
 from atari_py import get_game_path;
 
@@ -107,14 +108,15 @@ class VPG(object):
     
     def train(self, loop_time = 1000):
         
-        optimizer = tf.compat.v1.train.AdamOptimizer(1e-4);
+        optimizer = tf.keras.optimizers.Adam(1e-4);
         # setup checkpoint and log utils
-        checkpoint = tf.train.Checkpoint(model = self.policyModel, optimizer = optimizer, optimizer_step = tf.compat.v1.train.get_or_create_global_step());
+        checkpoint = tf.train.Checkpoint(model = self.policyModel, optimizer = optimizer, optimizer_step = optimizer.iterations);
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints'));
         log = tf.summary.create_file_writer('checkpoints');
-        log.set_as_default();
         for i in range(loop_time):
             trajectory, total_reward = self.PlayOneEpisode();
+            avg_policy_loss = tf.keras.metrics.Mean(name = 'policy loss', dtype = tf.float32);
+            avg_value_loss = tf.keras.metrics.Mean(name = 'value loss', dtype = tf.float32);
             for status in reversed(trajectory):
                 # policy loss
                 with tf.GradientTape() as tape:
@@ -125,9 +127,15 @@ class VPG(object):
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
                     policy_loss = -tf.reduce_mean(log_probs * advantage);
                     value_loss = tf.math.squared_difference(Vt, total_reward);
+                    avg_policy_loss.update_state(policy_loss);
+                    avg_value_loss.update_state(value_loss);
                 # write loss to summary
-                tf.summary.scalar('policy loss',policy_loss);
-                tf.summary.scalar('value loss',value_loss);
+                if tf.equal(optimizer.iterations % 1, 0):
+                    with log.as_default():
+                        summary_ops_v2.scalar('policy loss',avg_policy_loss.result(), step = optimizer.iterations);
+                        summary_ops_v2.scalar('value loss',avg_value_loss.result(), step = optimizer.iterations);
+                    avg_policy_loss.reset_states();
+                    avg_value_loss.reset_states();
                 # train policy
                 policy_grads = tape.gradient(policy_loss,self.policyModel.variables);
                 optimizer.apply_gradients(zip(policy_grads,model.variables), global_step = tf.train.get_global_step());
