@@ -125,7 +125,7 @@ class VPG(object):
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
                     loss = -tf.reduce_mean(log_probs * advantage);
                 # write policy loss
-                with tf.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
+                with tf.compat.v1.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
                     tf.contrib.summary.scalar('policy loss',loss);
                 # train policy
                 grads = tape.gradient(loss,self.policyModel.variables);
@@ -136,7 +136,7 @@ class VPG(object):
                     Vt, logPt = self.policyModel(self.status2tensor(status[0]));
                     loss = tf.math.squared_difference(Vt, total_reward);
                 # write value loss
-                with tf.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
+                with tf.compat.v1.summary.record_summaries_every_n_global_steps(1,global_step = tf.train.get_global_step()):
                     tf.contrib.summary.scalar('value loss',loss);
                 # train value
                 grads = tape.gradient(loss,self.policyModel.variables);
