@@ -15,20 +15,16 @@ class PolicyModel(tf.keras.Model):
         assert type(legal_actions) is np.ndarray and len(legal_actions) > 0;
         super(PolicyModel,self).__init__();
         self.conv1 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'same');
-        self.bn1 = tf.keras.layers.BatchNormalization();
         self.relu1 = tf.keras.layers.ReLU();
         self.maxpool1 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
         self.conv2 = tf.keras.layers.Conv2D(128, kernel_size = [3,3], padding = 'same');
-        self.bn2 = tf.keras.layers.BatchNormalization();
         self.relu2 = tf.keras.layers.ReLU();
         self.maxpool2 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
         self.conv3 = tf.keras.layers.Conv2D(256, kernel_size = [3,3], padding = 'same');
-        self.bn3 = tf.keras.layers.BatchNormalization();
         self.relu3 = tf.keras.layers.ReLU();
         self.reduce = tf.keras.layers.Lambda(lambda x: tf.math.reduce_sum(x, axis = [1,2]));
         self.dense4 = tf.keras.layers.Dense(200);
         self.dropout4 = tf.keras.layers.Dropout(0.5);
-        self.bn4 = tf.keras.layers.BatchNormalization();
         self.relu4 = tf.keras.layers.ReLU();
         # output P(a|s)
         self.dense5 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
@@ -39,20 +35,16 @@ class PolicyModel(tf.keras.Model):
     def call(self, input):
         
         result = self.conv1(input);
-        result = self.bn1(result);
         result = self.relu1(result);
         result = self.maxpool1(result);
         result = self.conv2(result);
-        result = self.bn2(result);
         result = self.relu2(result);
         result = self.maxpool2(result);
         result = self.conv3(result);
-        result = self.bn3(result);
         result = self.relu3(result);
         result = self.reduce(result);
         result = self.dense4(result);
         result = self.dropout4(result);
-        result = self.bn4(result);
         result = self.relu4(result);
         logP = self.dense5(result);
         V = self.dense6(result);
@@ -144,7 +136,8 @@ class VPG(object):
             checkpoint.save(os.path.join('checkpoints','ckpt'));
         # save final model
         if False == os.path.exists('model'): os.mkdir('model');
-        tf.saved_model.save(self.policyModel,'./model/vpg_model');
+        #tf.saved_model.save(self.policyModel,'./model/vpg_model');
+        self.policyModel.save_weights('./model/vpg_model');
 
 def main():
 
