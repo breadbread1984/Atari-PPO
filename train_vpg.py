@@ -127,6 +127,7 @@ class VPG(object):
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
                     policy_loss = -tf.math.reduce_mean(log_probs * advantage);
                     value_loss = tf.math.squared_difference(Vt, total_reward);
+                    loss = policy_loss + value_loss;
                     avg_policy_loss.update_state(policy_loss);
                     avg_value_loss.update_state(value_loss);
                 # write loss to summary
@@ -137,7 +138,7 @@ class VPG(object):
                     avg_policy_loss.reset_states();
                     avg_value_loss.reset_states();
                 # train policy and value
-                grads = tape.gradient(policy_loss + value_loss,self.policyModel.variables);
+                grads = tape.gradient(loss,self.policyModel.variables);
                 optimizer.apply_gradients(zip(grads,self.policyModel.variables));
             # save model every episode
             checkpoint.save(os.path.join('checkpoints','ckpt'));
