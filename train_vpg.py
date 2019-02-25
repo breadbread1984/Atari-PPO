@@ -122,7 +122,7 @@ class VPG(object):
                     avg_policy_loss.update_state(policy_loss);
                     avg_value_loss.update_state(value_loss);
                 # write loss to summary
-                if tf.equal(optimizer.iterations % 1, 0):
+                if tf.equal(optimizer.iterations % 100, 0):
                     with log.as_default():
                         tf.summary.scalar('policy loss',avg_policy_loss.result(), step = optimizer.iterations);
                         tf.summary.scalar('value loss',avg_value_loss.result(), step = optimizer.iterations);
