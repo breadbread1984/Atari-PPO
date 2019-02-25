@@ -4,7 +4,6 @@ import os;
 import numpy as np;
 import cv2;
 import tensorflow as tf;
-from tensorflow.python.ops import summary_ops_v2;
 from atari_py import ALEInterface;
 from atari_py import get_game_path;
 
@@ -125,8 +124,8 @@ class VPG(object):
                 # write loss to summary
                 if tf.equal(optimizer.iterations % 1, 0):
                     with log.as_default():
-                        summary_ops_v2.scalar('policy loss',avg_policy_loss.result(), step = optimizer.iterations);
-                        summary_ops_v2.scalar('value loss',avg_value_loss.result(), step = optimizer.iterations);
+                        tf.summary.scalar('policy loss',avg_policy_loss.result(), step = optimizer.iterations);
+                        tf.summary.scalar('value loss',avg_value_loss.result(), step = optimizer.iterations);
                     avg_policy_loss.reset_states();
                     avg_value_loss.reset_states();
                 # train policy and value
@@ -142,7 +141,7 @@ class VPG(object):
 def main():
 
     vpg = VPG();
-    vpg.train();
+    vpg.train(100);
 
 if __name__ == "__main__":
 
