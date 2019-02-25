@@ -125,7 +125,7 @@ class VPG(object):
                     action_mask = tf.one_hot(status[1],len(self.legal_actions));
                     log_probs = tf.math.reduce_sum(action_mask * logPt, axis = 1);
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
-                    policy_loss = -tf.reduce_mean(log_probs * advantage);
+                    policy_loss = -tf.math.reduce_mean(log_probs * advantage);
                     value_loss = tf.math.squared_difference(Vt, total_reward);
                     avg_policy_loss.update_state(policy_loss);
                     avg_value_loss.update_state(value_loss);
@@ -154,4 +154,3 @@ if __name__ == "__main__":
 
     assert tf.executing_eagerly();
     main();
-
