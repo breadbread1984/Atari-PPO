@@ -1,6 +1,6 @@
 # Atari-PPO
 
-This project implements Policy Proximity Optimization algorithm on Arcade Learning Environment with Caffe2.
+This project implements vanilla policy gradient on Arcade Learning Environment with Tensorflow 2.0.
 
 ### how to train
 
