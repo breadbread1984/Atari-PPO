@@ -56,7 +56,7 @@ class DQN(object):
         #load model
         if True == os.path.exists('model'): self.qnet.load_weights('./model/dqn_model');
         self.status_size_ = 4
-        self.gamma_ = 1; #the reward it too small
+        self.gamma_ = 0.8;
 
     def status2tensor(self,status):
         

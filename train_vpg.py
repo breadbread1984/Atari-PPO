@@ -103,8 +103,8 @@ class VPG(object):
         optimizer = tf.keras.optimizers.Adam(1e-3);
         # setup checkpoint and log utils
         checkpoint = tf.train.Checkpoint(model = self.policyModel, optimizer = optimizer, optimizer_step = optimizer.iterations);
-        checkpoint.restore(tf.train.latest_checkpoint('checkpoints'));
-        log = tf.summary.create_file_writer('checkpoints');
+        checkpoint.restore(tf.train.latest_checkpoint('checkpoints_vpg'));
+        log = tf.summary.create_file_writer('checkpoints_vpg');
         for i in range(loop_time):
             trajectory, total_reward = self.PlayOneEpisode();
             avg_policy_loss = tf.keras.metrics.Mean(name = 'policy loss', dtype = tf.float32);
@@ -133,7 +133,7 @@ class VPG(object):
                 grads = tape.gradient(loss,self.policyModel.variables);
                 optimizer.apply_gradients(zip(grads,self.policyModel.variables));
             # save model every episode
-            checkpoint.save(os.path.join('checkpoints','ckpt'));
+            checkpoint.save(os.path.join('checkpoints_vpg','ckpt'));
         # save final model
         if False == os.path.exists('model'): os.mkdir('model');
         #tf.saved_model.save(self.policyModel,'./model/vpg_model');
