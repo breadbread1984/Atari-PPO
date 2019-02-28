@@ -13,41 +13,41 @@ class PolicyModel(tf.keras.Model):
 
         assert type(legal_actions) is np.ndarray and len(legal_actions) > 0;
         super(PolicyModel,self).__init__();
-        self.conv1 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'same');
-        self.relu1 = tf.keras.layers.ReLU();
-        self.maxpool1 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
-        self.conv2 = tf.keras.layers.Conv2D(128, kernel_size = [3,3], padding = 'same');
-        self.relu2 = tf.keras.layers.ReLU();
-        self.maxpool2 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
-        self.conv3 = tf.keras.layers.Conv2D(256, kernel_size = [3,3], padding = 'same');
-        self.relu3 = tf.keras.layers.ReLU();
+        self.conv1 = tf.keras.layers.Conv2D(32, kernel_size = [8,8], strides = [4,4], padding = 'valid');
+        self.conv2 = tf.keras.layers.Conv2D(64, kernel_size = [4,4], strides = [2,2], padding = 'valid');
+        self.conv3 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'valid');
         self.reduce = tf.keras.layers.Lambda(lambda x: tf.math.reduce_sum(x, axis = [1,2]));
-        self.dense4 = tf.keras.layers.Dense(200);
+        self.dense4 = tf.keras.layers.Dense(512);
         self.dropout4 = tf.keras.layers.Dropout(0.5);
-        self.relu4 = tf.keras.layers.ReLU();
+        self.dense5 = tf.keras.layers.Dense(512);
+        self.dropout5 = tf.keras.layers.Dropout(0.5);
+        self.relu = tf.keras.layers.ReLU();
         # output P(a|s)
-        self.dense5 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
+        self.dense6 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
         self.exp = tf.keras.layers.Lambda(lambda x: tf.math.exp(x));
         # output V(s)
-        self.dense6 = tf.keras.layers.Dense(1, activation = tf.math.sigmoid);
+        self.dense7 = tf.keras.layers.Dense(1, activation = tf.math.sigmoid);
         
     def call(self, input):
         
         result = self.conv1(input);
-        result = self.relu1(result);
+        result = self.relu(result);
         result = self.maxpool1(result);
         result = self.conv2(result);
-        result = self.relu2(result);
+        result = self.relu(result);
         result = self.maxpool2(result);
         result = self.conv3(result);
-        result = self.relu3(result);
+        result = self.relu(result);
         result = self.reduce(result);
         result = self.dense4(result);
         result = self.dropout4(result);
-        result = self.relu4(result);
-        logP = self.dense5(result);
+        result = self.relu(result);
+        result = self.dense5(result);
+        result = self.dtopout5(result);
+        result = self.relu(result);
+        logP = self.dense6(result);
         P = self.exp(logP);
-        V = self.dense6(result);
+        V = self.dense7(result);
         return V, P;
 
 class VPG(object):
@@ -70,6 +70,12 @@ class VPG(object):
         status = tf.expand_dims(status,0);
         return status;
         
+    def preprocess(self, image):
+        
+        frame = image[25:185,:,:];
+        frame = cv2.resize(frame,(84,84)) / 255.0;
+        return frame;
+        
     def PlayOneEpisode(self):
         
         self.ale.reset_game();
@@ -77,7 +83,7 @@ class VPG(object):
         status = list();
         # initial status
         for i in range(self.status_size_):
-            current_frame = cv2.resize(self.ale.getScreenGrayscale(),(160,160));
+            current_frame = self.preprocess(self.ale.getScreenGrayscale());
             status.append(current_frame);
             assert False == self.ale.game_over();
         # play until game over
@@ -87,16 +93,17 @@ class VPG(object):
             cv2.waitKey(10);
             # choose action 
             input = self.status2tensor(status);
-            V, P = self.policyModel(input);
-            action_index = tf.random.categorical(P,1);
-            reward = self.ale.act(self.legal_actions[action_index]);
-            status.append(cv2.resize(self.ale.getScreenGrayscale(),(160,160)));
-            trajectory.append((status[0:self.status_size_],action_index,reward,status[1:]));
+            Qt = self.qnet(input);
+            action_index = tf.random.categorical(tf.math.exp(Qt),1);
+            reward = 0;
+            for i in range(self.status_size):
+                reward += self.ale.act(self.legal_actions[action_index]);
+            current_frame = self.preprocess(self.ale.getScreenGrayscale());
+            status.append(current_frame);
+            game_over = ale.game_over();
+            trajectory.append((status[0:self.status_size_],action_index,reward,status[1:],game_over));
             status = status[1:];
-        total_reward = 0;
-        for status in reversed(trajectory):
-            total_reward = status[2] + self.gamma_ * total_reward;
-        return trajectory, total_reward;
+        return trajectory;
     
     def train(self, loop_time = 1000):
         
@@ -115,9 +122,9 @@ class VPG(object):
                     Vt, Pt = self.policyModel(self.status2tensor(status[0]));
                     Vtp1, Ptp1 = self.policyModel(self.status2tensor(status[3]));
                     action_mask = tf.one_hot(status[1],len(self.legal_actions));
-                    probs = tf.math.reduce_sum(action_mask * Pt, axis = 1);
+                    log_probs = tf.math.reduce_sum(action_mask * tf.math.log(Pt), axis = 1);
                     advantage = -Vt + status[2] + self.gamma_ * Vtp1;
-                    policy_loss = -tf.math.reduce_mean(probs * advantage);
+                    policy_loss = -tf.math.reduce_mean(log_probs * advantage);
                     value_loss = tf.math.squared_difference(Vt, total_reward);
                     loss = policy_loss + value_loss;
                     avg_policy_loss.update_state(policy_loss);

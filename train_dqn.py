@@ -13,36 +13,34 @@ class QNet(tf.keras.Model):
 
         assert type(legal_actions) is np.ndarray and len(legal_actions) > 0;
         super(QNet,self).__init__();
-        self.conv1 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'same');
-        self.relu1 = tf.keras.layers.ReLU();
-        self.maxpool1 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
-        self.conv2 = tf.keras.layers.Conv2D(128, kernel_size = [3,3], padding = 'same');
-        self.relu2 = tf.keras.layers.ReLU();
-        self.maxpool2 = tf.keras.layers.MaxPool2D(pool_size = [2,2], strides = [2,2], padding = 'valid');
-        self.conv3 = tf.keras.layers.Conv2D(256, kernel_size = [3,3], padding = 'same');
-        self.relu3 = tf.keras.layers.ReLU();
+        self.conv1 = tf.keras.layers.Conv2D(32, kernel_size = [8,8], strides = [4,4], padding = 'valid');
+        self.conv2 = tf.keras.layers.Conv2D(64, kernel_size = [4,4], strides = [2,2], padding = 'valid');
+        self.conv3 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'valid');
         self.reduce = tf.keras.layers.Lambda(lambda x: tf.math.reduce_sum(x, axis = [1,2]));
-        self.dense4 = tf.keras.layers.Dense(200);
+        self.dense4 = tf.keras.layers.Dense(512);
         self.dropout4 = tf.keras.layers.Dropout(0.5);
-        self.relu4 = tf.keras.layers.ReLU();
+        self.dense5 = tf.keras.layers.Dense(512);
+        self.dropout5 = tf.keras.layers.Dropout(0.5);
+        self.relu = tf.keras.layers.ReLU();
         # output Q(s,a)
-        self.dense5 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
+        self.dense6 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
         
     def call(self, input):
         
         result = self.conv1(input);
-        result = self.relu1(result);
-        result = self.maxpool1(result);
+        result = self.relu(result);
         result = self.conv2(result);
-        result = self.relu2(result);
-        result = self.maxpool2(result);
+        result = self.relu(result);
         result = self.conv3(result);
-        result = self.relu3(result);
+        result = self.relu(result);
         result = self.reduce(result);
         result = self.dense4(result);
         result = self.dropout4(result);
-        result = self.relu4(result);
-        Q = self.dense5(result);
+        result = self.relu(result);
+        result = self.dense5(result);
+        result = self.dropout5(result);
+        result = self.relu(result);
+        Q = self.dense6(result);
         return Q;
 
 class DQN(object):
@@ -56,7 +54,7 @@ class DQN(object):
         #load model
         if True == os.path.exists('model'): self.qnet.load_weights('./model/dqn_model');
         self.status_size_ = 4
-        self.gamma_ = 0.8;
+        self.gamma_ = 1;
 
     def status2tensor(self,status):
         
@@ -64,6 +62,12 @@ class DQN(object):
         status = tf.transpose(status,[1,2,0]);
         status = tf.expand_dims(status,0);
         return status;
+    
+    def preprocess(self, image):
+        
+        frame = image[25:185,:,:];
+        frame = cv2.resize(frame,(84,84)) / 255.0;
+        return frame;
         
     def PlayOneEpisode(self):
         
@@ -72,7 +76,7 @@ class DQN(object):
         status = list();
         # initial status
         for i in range(self.status_size_):
-            current_frame = cv2.resize(self.ale.getScreenGrayscale(),(160,160));
+            current_frame = self.preprocess(self.ale.getScreenGrayscale());
             status.append(current_frame);
             assert False == self.ale.game_over();
         # play until game over
@@ -84,9 +88,13 @@ class DQN(object):
             input = self.status2tensor(status);
             Qt = self.qnet(input);
             action_index = tf.random.categorical(tf.math.exp(Qt),1);
-            reward = self.ale.act(self.legal_actions[action_index]);
-            status.append(cv2.resize(self.ale.getScreenGrayscale(),(160,160)));
-            trajectory.append((status[0:self.status_size_],action_index,reward,status[1:]));
+            reward = 0;
+            for i in range(self.status_size):
+                reward += self.ale.act(self.legal_actions[action_index]);
+            current_frame = self.preprocess(self.ale.getScreenGrayscale());
+            status.append(current_frame);
+            game_over = ale.game_over();
+            trajectory.append((status[0:self.status_size_],action_index,reward,status[1:],game_over));
             status = status[1:];
         return trajectory;
     
@@ -108,7 +116,7 @@ class DQN(object):
                     action_mask = tf.one_hot(status[1],len(self.legal_actions));
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
                     qtp1 = tf.math.reduce_max(Qtp1, axis = 1);
-                    value = status[2] + self.gamma_ * qtp1;
+                    value = status[2] + (self.gamma_ * qtp1 if False == status[4] else 0);
                     loss = tf.math.squared_difference(qt, value);
                     avg_loss.update_state(loss);
                 # write loss to summary
