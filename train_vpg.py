@@ -32,10 +32,8 @@ class PolicyModel(tf.keras.Model):
         
         result = self.conv1(input);
         result = self.relu(result);
-        result = self.maxpool1(result);
         result = self.conv2(result);
         result = self.relu(result);
-        result = self.maxpool2(result);
         result = self.conv3(result);
         result = self.relu(result);
         result = self.reduce(result);
@@ -43,7 +41,7 @@ class PolicyModel(tf.keras.Model):
         result = self.dropout4(result);
         result = self.relu(result);
         result = self.dense5(result);
-        result = self.dtopout5(result);
+        result = self.dropout5(result);
         result = self.relu(result);
         logP = self.dense6(result);
         P = self.exp(logP);
@@ -93,17 +91,20 @@ class VPG(object):
             cv2.waitKey(10);
             # choose action 
             input = self.status2tensor(status);
-            Qt = self.qnet(input);
-            action_index = tf.random.categorical(tf.math.exp(Qt),1);
+            V, P = self.policyModel(input);
+            action_index = tf.random.categorical(P,1);
             reward = 0;
-            for i in range(self.status_size):
+            for i in range(self.status_size_):
                 reward += self.ale.act(self.legal_actions[action_index]);
             current_frame = self.preprocess(self.ale.getScreenGrayscale());
             status.append(current_frame);
-            game_over = ale.game_over();
+            game_over = self.ale.game_over();
             trajectory.append((status[0:self.status_size_],action_index,reward,status[1:],game_over));
             status = status[1:];
-        return trajectory;
+        total_reward = 0;
+        for status in reversed(trajectory):
+            total_reward = status[2] + self.gamma_ * total_reward;
+        return trajectory, total_reward;
     
     def train(self, loop_time = 1000):
         

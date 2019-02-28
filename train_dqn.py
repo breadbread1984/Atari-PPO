@@ -89,11 +89,11 @@ class DQN(object):
             Qt = self.qnet(input);
             action_index = tf.random.categorical(tf.math.exp(Qt),1);
             reward = 0;
-            for i in range(self.status_size):
+            for i in range(self.status_size_):
                 reward += self.ale.act(self.legal_actions[action_index]);
             current_frame = self.preprocess(self.ale.getScreenGrayscale());
             status.append(current_frame);
-            game_over = ale.game_over();
+            game_over = self.ale.game_over();
             trajectory.append((status[0:self.status_size_],action_index,reward,status[1:],game_over));
             status = status[1:];
         return trajectory;
