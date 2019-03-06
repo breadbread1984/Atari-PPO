@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import os;
+import random;
 import numpy as np;
 import cv2;
 import tensorflow as tf;
@@ -45,78 +46,118 @@ class QNet(tf.keras.Model):
 
 class DQN(object):
     
+    MEMORY_LIMIT = 900000;
+    BATCH_SIZE  = 128;
+    BURNIN_STEP = 50000;
+    TRAIN_FREQUENCY = 4;
+    UPDATE_FREQUENCY = 40000;
+    STATUS_SIZE = 4;
+    GAMMA = 1;
+    
     def __init__(self):
         
+        # ale related members
         self.ale = ALEInterface();
         self.ale.loadROM(get_game_path('boxing'));
         self.legal_actions = self.ale.getMinimalActionSet();
-        self.qnet = QNet(self.legal_actions);
-        #load model
-        if True == os.path.exists('model'): self.qnet.load_weights('./model/dqn_model');
-        self.status_size_ = 4
-        self.gamma_ = 1;
+        self.status = list();
+        # use qnet_latest to hold the latest updated weights 
+        self.qnet_latest = QNet(self.legal_actions);
+        # use qnet_target to hold the target model weights
+        self.qnet_target = QNet(self.legal_actions);
+        if True == os.path.exists('model'):
+            self.qnet_latest.load_weights('./model/dqn_model');
+        # use qnet_target as the rollout model
+        self.qnet_target.set_weights(self.qnet_latest.get_weights());
+        # status transition memory
+        self.memory = list();
 
-    def status2tensor(self,status):
+    def convertImgToTensor(self,status):
         
+        # status.shape = [4,48,48,1]
         status = tf.convert_to_tensor(status, dtype = tf.float32);
         status = tf.transpose(status,[1,2,0]);
         status = tf.expand_dims(status,0);
         return status;
     
-    def preprocess(self, image):
+    def convertBatchToTensor(self,batch):
         
+        st,at,rt,stp1,et = zip(*batch);
+        # st.shape = [batchsize,48,48,4]
+        st = tf.convert_to_tensor(st, dtype = tf.float32);
+        at = tf.convert_to_tensor(at, dtype = tf.int32);
+        rt = tf.convert_to_tensor(rt, dtype = tf.float32);
+        stp1 = tf.convert_to_tensor(stp1, dtype = tf.float32);
+        et = tf.convert_to_tensor(et, dtype = tf.bool);
+        return (st,at,rt,stp1,et);
+    
+    def getObservation(self):
+        
+        image = self.ale.getScreenGrayscale();
         frame = image[25:185,:,:];
         frame = cv2.resize(frame,(84,84)) / 255.0;
         return frame;
+    
+    def remember(self, transition):
         
-    def PlayOneEpisode(self):
+        if len(self.memory) > self.MEMORY_LIMIT: self.memory.pop(0);
+        self.memory.append(transition);
+    
+    def reset_game(self):
         
         self.ale.reset_game();
-        trajectory = list();
-        status = list();
-        # initial status
-        for i in range(self.status_size_):
-            current_frame = self.preprocess(self.ale.getScreenGrayscale());
-            status.append(current_frame);
+        for i in range(self.STATUS_SIZE):
+            current_frame = self.getObservation();
+            self.status.append(current_frame);
             assert False == self.ale.game_over();
-        # play until game over
-        while False == self.ale.game_over():
-            # display screen
-            cv2.imshow('screen',self.ale.getScreenRGB());
-            cv2.waitKey(10);
-            # choose action 
-            input = self.status2tensor(status);
-            Qt = self.qnet(input);
-            action_index = tf.random.categorical(tf.math.exp(Qt),1);
-            reward = 0;
-            for i in range(self.status_size_):
-                reward += self.ale.act(self.legal_actions[action_index]);
-            current_frame = self.preprocess(self.ale.getScreenGrayscale());
-            status.append(current_frame);
-            game_over = self.ale.game_over();
-            trajectory.append((status[0:self.status_size_],action_index,reward,status[1:],game_over));
-            status = status[1:];
-        return trajectory;
+
+    def rollout(self):
+        
+        if self.ale.game_over(): self.reset_game();
+        # display screen
+        cv2.imshow('screen',self.ale.getScreenRGB());
+        cv2.waitKey(1);
+        # choose action 
+        st = self.convertImgToTensor(self.status);
+        Qt = self.qnet_target(st);
+        action_index = tf.random.categorical(tf.math.exp(Qt),1);
+        reward = 0;
+        for i in range(self.STATUS_SIZE):
+            reward += self.ale.act(self.legal_actions[action_index]);
+        self.status.append(self.getObservation());
+        self.status.pop(0);
+        stp1 = self.convertImgToTensor(self.status);
+        game_over = self.ale.game_over();
+        self.remember((st,action_index,reward,stp1,game_over));
+        return reward;
     
-    def train(self, loop_time = 1000):
+    def train(self, loop_time = 10000000):
         
         optimizer = tf.keras.optimizers.Adam(1e-3);
         # setup checkpoint and log utils
-        checkpoint = tf.train.Checkpoint(model = self.qnet, optimizer = optimizer, optimizer_step = optimizer.iterations);
+        checkpoint = tf.train.Checkpoint(model = self.qnet_target, optimizer = optimizer, optimizer_step = optimizer.iterations);
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints_dqn'));
         log = tf.summary.create_file_writer('checkpoints_dqn');
+        self.reset_game();
         for i in range(loop_time):
-            trajectory = self.PlayOneEpisode();
-            avg_loss = tf.keras.metrics.Mean(name = 'loss', dtype = tf.float32);
-            for status in trajectory:
+            self.rollout();
+            # do nothing if collected samples are not enough
+            if i < self.BURNIN_STEP or len(self.memory) < self.BATCH_SIZE:
+                continue;
+            # update qnet_latest at certain frequency
+            if i % self.TRAIN_FREQUENCY == 0:
+                avg_loss = tf.keras.metrics.Mean(name = 'loss', dtype = tf.float32);
+                # random sample from memory
+                batch = random.sample(self.memory, self.BATCH_SIZE);
+                st,at,rt,stp1,et = self.convertBatchToTensor(batch);
                 # policy loss
                 with tf.GradientTape() as tape:
-                    Qt = self.qnet(self.status2tensor(status[0]));
-                    Qtp1 = self.qnet(self.status2tensor(status[3]));
-                    action_mask = tf.one_hot(status[1],len(self.legal_actions));
+                    Qt = self.qnet_target(st);
+                    Qtp1 = self.qnet_target(stp1);
+                    action_mask = tf.one_hot(at,len(self.legal_actions));
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
                     qtp1 = tf.math.reduce_max(Qtp1, axis = 1);
-                    value = status[2] + (self.gamma_ * qtp1 if False == status[4] else 0);
+                    value = rt + tf.cond(tf.equal(et,False),lambda:self.GAMMA * qtp1,lambda:0);
                     loss = tf.math.squared_difference(qt, value);
                     avg_loss.update_state(loss);
                 # write loss to summary
@@ -124,20 +165,22 @@ class DQN(object):
                     with log.as_default():
                         tf.summary.scalar('loss',avg_loss.result(), step = optimizer.iterations);
                     avg_loss.reset_states();
-                # train policy and value
-                grads = tape.gradient(loss,self.qnet.variables);
-                optimizer.apply_gradients(zip(grads,self.qnet.variables));
+                # train qnet_latest
+                grads = tape.gradient(loss,self.qnet_latest.variables);
+                optimizer.apply_gradients(zip(grads,self.qnet_latest.variables));
             # save model every episode
-            checkpoint.save(os.path.join('checkpoints_dqn','ckpt'));
+            if i % self.UPDATE_FREQUENCY == 0:
+                self.qnet_target.set_weights(self.qnet_latest.get_weights());
+                checkpoint.save(os.path.join('checkpoints_dqn','ckpt'));
         # save final model
         if False == os.path.exists('model'): os.mkdir('model');
         #tf.saved_model.save(self.qnet,'./model/vpg_model');
-        self.qnet.save_weights('./model/dqn_model');
+        self.qnet_target.save_weights('./model/dqn_model');
 
 def main():
 
     dqn = DQN();
-    dqn.train(1000);
+    dqn.train();
 
 if __name__ == "__main__":
 

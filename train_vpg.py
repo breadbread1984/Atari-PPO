@@ -150,8 +150,8 @@ class VPG(object):
 def main():
 
     vpg = VPG();
-    vpg.train(1000);
-    #vpg.PlayOneEpisode();
+    #vpg.train(1000);
+    vpg.PlayOneEpisode();
 
 if __name__ == "__main__":
 
