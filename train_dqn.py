@@ -46,11 +46,11 @@ class QNet(tf.keras.Model):
 
 class DQN(object):
     
-    MEMORY_LIMIT = 900000;
+    MEMORY_LIMIT = 9000;
     BATCH_SIZE  = 128;
-    BURNIN_STEP = 50000;
+    BURNIN_STEP = 500;
     TRAIN_FREQUENCY = 4;
-    UPDATE_FREQUENCY = 40000;
+    UPDATE_FREQUENCY = 400;
     STATUS_SIZE = 4;
     GAMMA = 1;
     
@@ -83,12 +83,12 @@ class DQN(object):
     def convertBatchToTensor(self,batch):
         
         st,at,rt,stp1,et = zip(*batch);
-        # st.shape = [batchsize,48,48,4]
-        st = tf.convert_to_tensor(st, dtype = tf.float32);
-        at = tf.convert_to_tensor(at, dtype = tf.int32);
-        rt = tf.convert_to_tensor(rt, dtype = tf.float32);
-        stp1 = tf.convert_to_tensor(stp1, dtype = tf.float32);
-        et = tf.convert_to_tensor(et, dtype = tf.bool);
+        # st.shape = batchsize*[1,48,48,4]
+        st = tf.squeeze(tf.concat(st, axis = 0));
+        at = tf.squeeze(tf.concat(at, axis = 0));
+        rt = tf.squeeze(tf.concat(rt, axis = 0));
+        stp1 = tf.squeeze(tf.concat(stp1, axis = 0));
+        et = tf.squeeze(tf.concat(et, axis = 0));
         return (st,at,rt,stp1,et);
     
     def getObservation(self):
@@ -116,19 +116,19 @@ class DQN(object):
         
         if self.ale.game_over(): self.reset_game();
         # display screen
-        cv2.imshow('screen',self.ale.getScreenRGB());
-        cv2.waitKey(1);
+        #cv2.imshow('screen',self.ale.getScreenRGB());
+        #cv2.waitKey(1);
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st);
         action_index = tf.random.categorical(tf.math.exp(Qt),1);
-        reward = 0;
+        reward = tf.convert_to_tensor([0], dtype = tf.float32);
         for i in range(self.STATUS_SIZE):
             reward += self.ale.act(self.legal_actions[action_index]);
         self.status.append(self.getObservation());
         self.status.pop(0);
         stp1 = self.convertImgToTensor(self.status);
-        game_over = self.ale.game_over();
+        game_over = tf.convert_to_tensor([self.ale.game_over()], dtype = tf.bool);
         self.remember((st,action_index,reward,stp1,game_over));
         return reward;
     
@@ -158,7 +158,7 @@ class DQN(object):
                     action_mask = tf.one_hot(at,len(self.legal_actions));
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
                     qtp1 = tf.math.reduce_max(Qtp1, axis = 1);
-                    value = rt + tf.cond(tf.equal(et,False),lambda:self.GAMMA * qtp1,lambda:0);
+                    value = rt + self.GAMMA * tf.cast(tf.equal(et,False),dtype = tf.float32) * qtp1;
                     loss = tf.math.squared_difference(qt, value);
                     avg_loss.update_state(loss);
                 # write loss to summary
