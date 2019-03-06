@@ -130,7 +130,7 @@ class DQN(object):
         stp1 = self.convertImgToTensor(self.status);
         game_over = self.ale.game_over();
         self.remember((st,action_index,reward,stp1,game_over));
-        return reward;
+        return game_over;
     
     def train(self, loop_time = 10000000):
         
@@ -141,7 +141,7 @@ class DQN(object):
         log = tf.summary.create_file_writer('checkpoints_dqn');
         self.reset_game();
         for i in range(loop_time):
-            self.rollout();
+            game_over = self.rollout();
             # do nothing if collected samples are not enough
             if i < self.BURNIN_STEP or len(self.memory) < self.BATCH_SIZE:
                 continue;
