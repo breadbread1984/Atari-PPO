@@ -106,6 +106,7 @@ class DQN(object):
     def reset_game(self):
         
         self.ale.reset_game();
+        self.status = list();
         for i in range(self.STATUS_SIZE):
             current_frame = self.getObservation();
             self.status.append(current_frame);
