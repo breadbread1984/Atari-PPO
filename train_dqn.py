@@ -46,7 +46,7 @@ class QNet(tf.keras.Model):
 
 class DQN(object):
     
-    MEMORY_LIMIT = 9000;
+    MEMORY_LIMIT = 90000;
     BATCH_SIZE  = 128;
     BURNIN_STEP = 500;
     TRAIN_FREQUENCY = 4;
@@ -114,10 +114,11 @@ class DQN(object):
 
     def rollout(self):
         
-        if self.ale.game_over(): self.reset_game();
+        if self.ale.game_over() or len(self.status) != self.STATUS_SIZE:
+            self.reset_game();
         # display screen
-        #cv2.imshow('screen',self.ale.getScreenRGB());
-        #cv2.waitKey(1);
+        cv2.imshow('screen',self.ale.getScreenRGB());
+        cv2.waitKey(1);
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st);
@@ -142,6 +143,13 @@ class DQN(object):
         self.reset_game();
         for i in range(loop_time):
             game_over = self.rollout();
+            # evaluate model when rollout to the end of an episode
+            if game_over:
+                avg_reward = tf.keras.metrics.Mean(name = 'reward', dtype = tf.float32);
+                for i in range(10): avg_reward.update_state(self.eval(steps = 20));
+                with log.as_default():
+                    tf.summary.scalar('reward', avg_reward.result(), step = optimizer.iterations);
+                avg_reward.reset_states();
             # do nothing if collected samples are not enough
             if i < self.BURNIN_STEP or len(self.memory) < self.BATCH_SIZE:
                 continue;
@@ -177,6 +185,31 @@ class DQN(object):
         if False == os.path.exists('model'): os.mkdir('model');
         #tf.saved_model.save(self.qnet,'./model/vpg_model');
         self.qnet_target.save_weights('./model/dqn_model');
+        
+    def eval(self, steps = None):
+        self.ale.reset_game();
+        status = list();
+        # full initial status
+        for i in range(self.STATUS_SIZE):
+            current_frame = self.getObservation();
+            status.append(current_frame);
+            assert False == self.ale.game_over();
+        # play one episode
+        total_reward = 0;
+        step = 0;
+        while False == self.ale.game_over() and (steps is None or step < steps):
+            # display screen
+            cv2.imshow('screen',self.ale.getScreenRGB());
+            cv2.waitKey(1);
+            st = self.convertImgToTensor(status);
+            Qt = self.qnet_target(st);
+            action_index = tf.random.categorical(tf.math.exp(Qt),1);
+            for i in range(self.STATUS_SIZE):
+                total_reward += self.ale.act(self.legal_actions[action_index]);
+            status.append(self.getObservation());
+            status.pop(0);
+            step += 1;
+        return total_reward;
 
 def main():
 
