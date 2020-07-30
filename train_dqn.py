@@ -46,11 +46,12 @@ class QNet(tf.keras.Model):
 
 class DQN(object):
     
-    MEMORY_LIMIT = 90000;
-    BATCH_SIZE  = 128;
-    BURNIN_STEP = 500;
+    SCALE = 10000;
+    MEMORY_LIMIT = 100 * SCALE;
+    BATCH_SIZE  = 32;
+    BURNIN_STEP = 5 * SCALE;
     TRAIN_FREQUENCY = 4;
-    UPDATE_FREQUENCY = 400;
+    UPDATE_FREQUENCY = SCALE;
     STATUS_SIZE = 4;
     GAMMA = 1;
     
@@ -135,7 +136,7 @@ class DQN(object):
     
     def train(self, loop_time = 10000000):
         
-        optimizer = tf.keras.optimizers.Adam(1e-3);
+        optimizer = tf.keras.optimizers.Adam(tf.keras.optimizers.schedules.ExponentialDecay(0.00025, 5 * self.SCALE, 0.96));
         # setup checkpoint and log utils
         checkpoint = tf.train.Checkpoint(model = self.qnet_target, optimizer = optimizer, optimizer_step = optimizer.iterations);
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints_dqn'));
