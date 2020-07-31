@@ -141,12 +141,12 @@ class DQN(object):
         checkpoint = tf.train.Checkpoint(model = self.qnet_target, optimizer = optimizer, optimizer_step = optimizer.iterations);
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints_dqn'));
         log = tf.summary.create_file_writer('checkpoints_dqn');
+        avg_reward = tf.keras.metrics.Mean(name = 'reward', dtype = tf.float32);
         self.reset_game();
         for i in range(loop_time):
             game_over = self.rollout();
             # evaluate model when rollout to the end of an episode
             if game_over:
-                avg_reward = tf.keras.metrics.Mean(name = 'reward', dtype = tf.float32);
                 for i in range(10): avg_reward.update_state(self.eval(steps = 20));
                 with log.as_default():
                     tf.summary.scalar('reward', avg_reward.result(), step = optimizer.iterations);
