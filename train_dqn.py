@@ -10,7 +10,7 @@ from atari_py import get_game_path;
 
 def QNet(action_num, hidden_sizes = [32, 20]):
 
-  inputs = tf.keras.Input((84, 84)); # inputs.shape = (batch, height, width)
+  inputs = tf.keras.Input((84, 84, 4)); # inputs.shape = (batch, height, width, 4)
   results = tf.keras.layers.Flatten()(inputs); # results.shape = (batch, height * width);
   for size in hidden_sizes:
     results = tf.keras.layers.Dense(units = size)(results); # results.shape = (batch, units);
@@ -49,10 +49,9 @@ class DQN(object):
 
     def convertImgToTensor(self,status):
         
-        # status.shape = [4,48,48,1]
-        status = tf.convert_to_tensor(status, dtype = tf.float32);
-        status = tf.transpose(status,[1,2,0]);
-        status = tf.expand_dims(status,0);
+        status = tf.convert_to_tensor(status, dtype = tf.float32); # status.shape = (4, 48, 48)
+        status = tf.transpose(status,[1,2,0]); # status.shape = (48, 48, 4)
+        status = tf.expand_dims(status,0); # status.shape = (1, 48, 48, 4)
         return status;
     
     def convertBatchToTensor(self,batch):
