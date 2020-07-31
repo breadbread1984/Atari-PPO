@@ -151,7 +151,7 @@ class DQN(object):
                 self.qnet_target.set_weights(self.qnet_latest.get_weights());
                 checkpoint.save(os.path.join('checkpoints_dqn','ckpt'));
                 # evaluate the updated model
-                for i in range(10): avg_reward.update_state(self.eval(step = 200));
+                for i in range(10): avg_reward.update_state(self.eval(steps = 200));
                 with log.as_default():
                     tf.summary.scalar('reward', avg_reward.result(), step = optimizer.iterations);
                 print('Step #%d Reward: %.6f lr: %.6f' % (optimizer.iterations, avg_reward.result(), optimizer._hyper['learning_rate'](optimizer.iterations)));
