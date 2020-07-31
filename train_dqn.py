@@ -8,41 +8,14 @@ import tensorflow as tf;
 from atari_py import ALEInterface;
 from atari_py import get_game_path;
 
-class QNet(tf.keras.Model):
+def QNet(action_num, hidden_sizes = [32, 20]):
 
-    def __init__(self, legal_actions = None):
-
-        assert type(legal_actions) is np.ndarray and len(legal_actions) > 0;
-        super(QNet,self).__init__();
-        self.conv1 = tf.keras.layers.Conv2D(32, kernel_size = [8,8], strides = [4,4], padding = 'valid');
-        self.conv2 = tf.keras.layers.Conv2D(64, kernel_size = [4,4], strides = [2,2], padding = 'valid');
-        self.conv3 = tf.keras.layers.Conv2D(64, kernel_size = [3,3], padding = 'valid');
-        self.reduce = tf.keras.layers.Lambda(lambda x: tf.math.reduce_sum(x, axis = [1,2]));
-        self.dense4 = tf.keras.layers.Dense(512);
-        self.dropout4 = tf.keras.layers.Dropout(0.5);
-        self.dense5 = tf.keras.layers.Dense(512);
-        self.dropout5 = tf.keras.layers.Dropout(0.5);
-        self.relu = tf.keras.layers.ReLU();
-        # output Q(s,a)
-        self.dense6 = tf.keras.layers.Dense(legal_actions.shape[0], activation = tf.math.sigmoid);
-        
-    def call(self, input):
-        
-        result = self.conv1(input);
-        result = self.relu(result);
-        result = self.conv2(result);
-        result = self.relu(result);
-        result = self.conv3(result);
-        result = self.relu(result);
-        result = self.reduce(result);
-        result = self.dense4(result);
-        result = self.dropout4(result);
-        result = self.relu(result);
-        result = self.dense5(result);
-        result = self.dropout5(result);
-        result = self.relu(result);
-        Q = self.dense6(result);
-        return Q;
+  inputs = tf.keras.Input((None, None, 3)); # inputs.shape = (batch, height, width , 3)
+  results = tf.keras.layers.Flatten()(inputs); # results.shape = (batch, height * width * 3);
+  for size in hidden_sizes:
+    results = tf.keras.layers.Dense(units = size)(results); # results.shape = (batch, units);
+  results = tf.keras.layers.Dense(units = action_num)(results); # results.shape = (batch, action_num)
+  return tf.keras.Model(inputs = inputs, outputs = results);
 
 class DQN(object):
     
@@ -64,9 +37,9 @@ class DQN(object):
         self.legal_actions = self.ale.getMinimalActionSet();
         self.status = list();
         # use qnet_latest to hold the latest updated weights 
-        self.qnet_latest = QNet(self.legal_actions);
+        self.qnet_latest = QNet(len(self.legal_actions));
         # use qnet_target to hold the target model weights
-        self.qnet_target = QNet(self.legal_actions);
+        self.qnet_target = QNet(len(self.legal_actions));
         if True == os.path.exists('model'):
             self.qnet_latest.load_weights('./model/dqn_model');
         # use qnet_target as the rollout model
