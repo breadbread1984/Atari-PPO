@@ -10,8 +10,8 @@ from atari_py import get_game_path;
 
 def QNet(action_num, hidden_sizes = [32, 20]):
 
-  inputs = tf.keras.Input((None, None, 3)); # inputs.shape = (batch, height, width , 3)
-  results = tf.keras.layers.Flatten()(inputs); # results.shape = (batch, height * width * 3);
+  inputs = tf.keras.Input((84, 84)); # inputs.shape = (batch, height, width)
+  results = tf.keras.layers.Flatten()(inputs); # results.shape = (batch, height * width);
   for size in hidden_sizes:
     results = tf.keras.layers.Dense(units = size)(results); # results.shape = (batch, units);
   results = tf.keras.layers.Dense(units = action_num)(results); # results.shape = (batch, action_num)
