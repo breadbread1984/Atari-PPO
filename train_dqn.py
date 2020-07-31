@@ -144,8 +144,8 @@ class DQN(object):
                         tf.summary.scalar('loss',avg_loss.result(), step = optimizer.iterations);
                     avg_loss.reset_states();
                 # train qnet_latest
-                grads = tape.gradient(loss,self.qnet_latest.variables);
-                optimizer.apply_gradients(zip(grads,self.qnet_latest.variables));
+                grads = tape.gradient(loss,self.qnet_latest.trainable_variables);
+                optimizer.apply_gradients(zip(grads,self.qnet_latest.trainable_variables));
             # save model every episode
             if i % self.UPDATE_FREQUENCY == 0:
                 self.qnet_target.set_weights(self.qnet_latest.get_weights());
