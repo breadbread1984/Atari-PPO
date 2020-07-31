@@ -149,9 +149,10 @@ class DQN(object):
             game_over = self.rollout();
             # evaluate model when rollout to the end of an episode
             if game_over:
-                for i in range(10): avg_reward.update_state(self.eval(steps = 20));
+                for i in range(10): avg_reward.update_state(self.eval(steps = 100));
                 with log.as_default():
                     tf.summary.scalar('reward', avg_reward.result(), step = optimizer.iterations);
+                print('Step #%d Reward: %.6f lr: %.6f' % (optimizer.iterations, avg_reward.result(), optimizer._hyper['learning_rate'](optimizer.iterations)));
                 avg_reward.reset_states();
             # do nothing if collected samples are not enough
             if i < self.BURNIN_STEP or len(self.memory) < self.BATCH_SIZE:
