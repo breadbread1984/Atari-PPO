@@ -119,9 +119,9 @@ class DQN(object):
         if self.ale.game_over() or len(self.status) != self.STATUS_SIZE:
             self.reset_game();
         if self.SHOW:
-          # display screen
-          cv2.imshow('screen',self.ale.getScreenRGB());
-          cv2.waitKey(1);
+            # display screen
+            cv2.imshow('screen',self.ale.getScreenRGB());
+            cv2.waitKey(1);
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st);
@@ -201,9 +201,10 @@ class DQN(object):
         total_reward = 0;
         step = 0;
         while False == self.ale.game_over() and (steps is None or step < steps):
-            # display screen
-            cv2.imshow('screen',self.ale.getScreenRGB());
-            cv2.waitKey(1);
+            if self.SHOW:
+                # display screen
+                cv2.imshow('screen',self.ale.getScreenRGB());
+                cv2.waitKey(1);
             st = self.convertImgToTensor(status);
             Qt = self.qnet_target(st);
             action_index = tf.random.categorical(tf.math.exp(Qt),1);
