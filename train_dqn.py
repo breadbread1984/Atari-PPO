@@ -46,6 +46,7 @@ class QNet(tf.keras.Model):
 
 class DQN(object):
     
+    SHOW = False;
     SCALE = 10000;
     MEMORY_LIMIT = 100 * SCALE;
     BATCH_SIZE  = 32;
@@ -117,9 +118,10 @@ class DQN(object):
         
         if self.ale.game_over() or len(self.status) != self.STATUS_SIZE:
             self.reset_game();
-        # display screen
-        cv2.imshow('screen',self.ale.getScreenRGB());
-        cv2.waitKey(1);
+        if self.SHOW:
+          # display screen
+          cv2.imshow('screen',self.ale.getScreenRGB());
+          cv2.waitKey(1);
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st);
