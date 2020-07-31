@@ -49,9 +49,9 @@ class DQN(object):
 
     def convertImgToTensor(self,status):
         
-        status = tf.convert_to_tensor(status, dtype = tf.float32); # status.shape = (4, 48, 48)
-        status = tf.transpose(status,[1,2,0]); # status.shape = (48, 48, 4)
-        status = tf.expand_dims(status,0); # status.shape = (1, 48, 48, 4)
+        status = tf.constant(status, dtype = tf.float32); # status.shape = (4, 48, 48)
+        status = tf.transpose(status, (1, 2, 0)); # status.shape = (48, 48, 4)
+        status = tf.expand_dims(status, axis = 0); # status.shape = (1, 48, 48, 4)
         return status;
     
     def convertBatchToTensor(self,batch):
@@ -98,14 +98,14 @@ class DQN(object):
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st);
         action_index = tf.random.categorical(tf.math.exp(Qt),1);
-        reward = tf.convert_to_tensor([0], dtype = tf.float32);
+        reward = 0;
         for i in range(self.STATUS_SIZE):
             reward += self.ale.act(self.legal_actions[action_index]);
         self.status.append(self.getObservation());
         self.status.pop(0);
         stp1 = self.convertImgToTensor(self.status);
-        game_over = tf.convert_to_tensor([self.ale.game_over()], dtype = tf.bool);
-        self.remember((st,action_index,reward,stp1,game_over));
+        game_over = 1. if self.ale.game_over() else 0.;
+        self.remember((st, action_index, reward, stp1, game_over));
         return game_over;
     
     def train(self, loop_time = 10000000):
@@ -134,9 +134,9 @@ class DQN(object):
                     Qtp1 = self.qnet_target(stp1);
                     action_mask = tf.one_hot(at,len(self.legal_actions));
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
-                    qtp1 = tf.math.reduce_max(Qtp1, axis = 1);
-                    value = rt + self.GAMMA * tf.cast(tf.equal(et,False),dtype = tf.float32) * qtp1;
-                    loss = tf.math.squared_difference(qt, value);
+                    qtp1 = tf.math.reduce_max(Qtp1, axis = 1); # max_a Q(s, a)
+                    value = rt + self.GAMMA * (tf.ones_like(et) - et) * qtp1;
+                    loss = tf.keras.losses.MES(value, qt);
                     avg_loss.update_state(loss);
                 # write loss to summary
                 if tf.equal(optimizer.iterations % 100, 0):
