@@ -53,7 +53,7 @@ class DQN(object):
     TRAIN_FREQUENCY = 4;
     UPDATE_FREQUENCY = SCALE;
     STATUS_SIZE = 4;
-    GAMMA = 1;
+    GAMMA = 0.99;
     
     def __init__(self):
         
