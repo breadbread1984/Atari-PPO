@@ -136,7 +136,7 @@ class DQN(object):
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
                     qtp1 = tf.math.reduce_max(Qtp1, axis = 1); # max_a Q(s, a)
                     value = rt + self.GAMMA * (tf.ones_like(et) - et) * qtp1;
-                    loss = tf.keras.losses.MES(value, qt);
+                    loss = tf.keras.losses.MSE(value, qt);
                     avg_loss.update_state(loss);
                 # write loss to summary
                 if tf.equal(optimizer.iterations % 100, 0):
