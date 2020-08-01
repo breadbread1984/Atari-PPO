@@ -56,7 +56,7 @@ class DQN(object):
     
     def convertBatchToTensor(self,batch):
         
-        st,at,rt,stp1,et = zip(*batch);
+        st, at, rt, stp1, et = zip(*batch);
         # st.shape = batchsize*[1,48,48,4]
         st = tf.squeeze(tf.concat(st, axis = 0));
         at = tf.squeeze(tf.concat(at, axis = 0));
@@ -105,7 +105,7 @@ class DQN(object):
         self.status.pop(0);
         stp1 = self.convertImgToTensor(self.status);
         game_over = 1. if self.ale.game_over() else 0.;
-        self.remember((st, action_index, reward, stp1, game_over));
+        self.remember((st, action_index, float(reward), stp1, game_over));
         return game_over;
     
     def train(self, loop_time = 10000000):
