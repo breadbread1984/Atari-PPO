@@ -146,6 +146,8 @@ class DQN(object):
                 st, at, rt, stp1, et = self.convertBatchToTensor(batch);
                 # policy loss
                 with tf.GradientTape() as tape:
+                    Qt = self.qnet_target(st);
+                    Qtp1 = self.qnet_target(stp1);
                     loss = self.loss([Qt, Qtp1, rt, at, et]);
                     avg_loss.update_state(loss);
                 # write loss to summary
