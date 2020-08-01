@@ -17,6 +17,20 @@ def QNet(action_num, hidden_sizes = [32, 20]):
   results = tf.keras.layers.Dense(units = action_num)(results); # results.shape = (batch, action_num)
   return tf.keras.Model(inputs = inputs, outputs = results);
 
+def Loss(action_num, gamma):
+
+  Qt = tf.keras.Input((action_num, ), dtype = tf.float32); # Qt.shape = (batch, action_num)
+  Qtp1 = tf.keras.Input((action_num, ), dtype = tf.float32); # Qtp1.shape = (batch, action_num)
+  rt = tf.keras.Input((), dtype = tf.float32); # rt.shape = (batch,)
+  at = tf.keras.Input((), dtype = tf.int32); # at.shape = (batch,)
+  et = tf.keras.Input((), dtype = tf.float32); # et.shape = (batch,)
+  action_mask = tf.keras.layers.Lambda(lambda x, n: tf.one_hot(x, n), arguments = {'n': action_num})(at); # action_mask.shape = (batch, action_num)
+  qt = tf.keras.layers.Lambda(lambda x: tf.math.reduce_sum(x[0] * x[1], axis = 1))([action_mask, Qt]); # qt.shape = (batch,)
+  qtp1 = tf.keras.layers.Lambda(lambda x: tf.math.reduce_max(x, axis = 1))(Qtp1); # max_a Q(s, a).shape = (batch,)
+  value = tf.keras.layers.Lambda(lambda x, g: x[0] + g * (tf.ones_like(x[1]) - x[1]) * x[2], arguments = {'g': gamma})([rt, et, qtp1]); # value.shape = (batch,)
+  loss = tf.keras.losses.MSE(value, qt);
+  return tf.keras.Model(inputs = (Qt, Qtp1, rt, at, et), outputs = loss);
+
 class DQN(object):
     
     SHOW = False;
@@ -44,6 +58,8 @@ class DQN(object):
             self.qnet_latest.load_weights('./model/dqn_model');
         # use qnet_target as the rollout model
         self.qnet_target.set_weights(self.qnet_latest.get_weights());
+        # loss
+        self.loss = Loss(len(self.legal_actions), self.GAMMA);
         # status transition memory
         self.memory = list();
 
@@ -130,13 +146,7 @@ class DQN(object):
                 st, at, rt, stp1, et = self.convertBatchToTensor(batch);
                 # policy loss
                 with tf.GradientTape() as tape:
-                    Qt = self.qnet_target(st);
-                    Qtp1 = self.qnet_target(stp1);
-                    action_mask = tf.one_hot(at,len(self.legal_actions));
-                    qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
-                    qtp1 = tf.math.reduce_max(Qtp1, axis = 1); # max_a Q(s, a)
-                    value = rt + self.GAMMA * (tf.ones_like(et, dtype = tf.float32) - et) * qtp1;
-                    loss = tf.keras.losses.MSE(value, qt);
+                    loss = self.loss([Qt, Qtp1, rt, at, et]);
                     avg_loss.update_state(loss);
                 # write loss to summary
                 if tf.equal(optimizer.iterations % 100, 0):
