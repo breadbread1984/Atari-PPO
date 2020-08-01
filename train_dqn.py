@@ -127,7 +127,7 @@ class DQN(object):
                 avg_loss = tf.keras.metrics.Mean(name = 'loss', dtype = tf.float32);
                 # random sample from memory
                 batch = random.sample(self.memory, self.BATCH_SIZE);
-                st,at,rt,stp1,et = self.convertBatchToTensor(batch);
+                st, at, rt, stp1, et = self.convertBatchToTensor(batch);
                 # policy loss
                 with tf.GradientTape() as tape:
                     Qt = self.qnet_target(st);
@@ -135,7 +135,7 @@ class DQN(object):
                     action_mask = tf.one_hot(at,len(self.legal_actions));
                     qt = tf.math.reduce_sum(action_mask * Qt, axis = 1);
                     qtp1 = tf.math.reduce_max(Qtp1, axis = 1); # max_a Q(s, a)
-                    value = rt + self.GAMMA * (tf.ones_like(et) - et) * qtp1;
+                    value = rt + self.GAMMA * (tf.ones_like(et, dtype = tf.float32) - et) * qtp1;
                     loss = tf.keras.losses.MSE(value, qt);
                     avg_loss.update_state(loss);
                 # write loss to summary
