@@ -146,8 +146,8 @@ class DQN(object):
                 st, at, rt, stp1, et = self.convertBatchToTensor(batch);
                 # policy loss
                 with tf.GradientTape() as tape:
-                    Qt = self.qnet_target(st);
-                    Qtp1 = self.qnet_target(stp1);
+                    Qt = self.qnet_latest(st);
+                    Qtp1 = self.qnet_latest(stp1);
                     loss = self.loss([Qt, Qtp1, rt, at, et]);
                     avg_loss.update_state(loss);
                 # write loss to summary
@@ -156,7 +156,7 @@ class DQN(object):
                         tf.summary.scalar('loss',avg_loss.result(), step = optimizer.iterations);
                     avg_loss.reset_states();
                 # train qnet_latest
-                grads = tape.gradient(loss,self.qnet_target.trainable_variables);
+                grads = tape.gradient(loss,self.qnet_latest.trainable_variables);
                 optimizer.apply_gradients(zip(grads,self.qnet_latest.trainable_variables));
             # save model every episode
             if i % self.UPDATE_FREQUENCY == 0:
