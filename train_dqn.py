@@ -150,7 +150,7 @@ class DQN(object):
         for i in range(loop_time):
             game_over = self.rollout();
             if game_over: self.ep_count += 1;
-            if game_over and self.ep_count % TEST_INTERVAL == 0:
+            if game_over and self.ep_count % self.TEST_INTERVAL == 0:
                 # evaluate the updated model
                 for i in range(10): avg_reward.update_state(self.eval(steps = 1000));
                 with log.as_default():
