@@ -122,7 +122,7 @@ class DQN(object):
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st); # Qt.shape = (1, action_num)
-        ep = self.ep_end + max(0., (self.ep_start - self.ep_end) * (self.ep_end_t - max(0., self.optimizer.iterations - self.learn_start)) / self.ep_end_t);
+        ep = self.ep_end + max(0., (self.ep_start - self.ep_end) * (self.ep_end_t - max(0., int(self.optimizer.iterations) - self.learn_start)) / self.ep_end_t);
         if np.random.uniform(low = 0., high = 1., size = ()) < ep:
             # explore at first
             action_index = tf.constant(np.random.randint(low = 0, high = len(self.legal_actions), size = (1,1)), dtype = tf.int64); # action_index.shape = (1, 1)
