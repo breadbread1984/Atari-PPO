@@ -205,7 +205,7 @@ class DQN(object):
                 cv2.waitKey(1);
             st = self.convertImgToTensor(status);
             Qt = self.qnet_latest(st);
-            action_index = tf.random.categorical(tf.math.exp(Qt),1);
+            action_index = tf.random.categorical(tf.keras.layers.Softmax(axis = -1)(Qt),1);
             for i in range(self.STATUS_SIZE):
                 total_reward += self.ale.act(self.legal_actions[action_index]);
             status.append(self.getObservation());
