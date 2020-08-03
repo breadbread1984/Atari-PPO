@@ -42,6 +42,10 @@ class DQN(object):
     UPDATE_FREQUENCY = SCALE;
     STATUS_SIZE = 4;
     GAMMA = 0.99;
+    ep_end = 0.1;
+    ep_start = 1.;
+    ep_end_t = MEMORY_LIMIT;
+    learn_start = 5 * SCALE;
     
     def __init__(self):
         
@@ -62,6 +66,8 @@ class DQN(object):
         self.loss = Loss(len(self.legal_actions), self.GAMMA);
         # status transition memory
         self.memory = list();
+        # step counter
+        self.step = 0;
 
     def convertImgToTensor(self,status):
         
@@ -101,6 +107,7 @@ class DQN(object):
             current_frame = self.getObservation();
             self.status.append(current_frame);
             assert False == self.ale.game_over();
+        self.step = 0;
 
     def rollout(self):
         
@@ -112,8 +119,12 @@ class DQN(object):
             cv2.waitKey(1);
         # choose action 
         st = self.convertImgToTensor(self.status);
-        Qt = self.qnet_target(st);
-        action_index = tf.random.categorical(tf.math.exp(Qt),1);
+        Qt = self.qnet_target(st); # Qt.shape = (1, action_num)
+        ep = self.ep_end + max(0., (self.ep_start - self.ep_end) * (self.ep_end - max(0., self.step - self.learn_start)) / self.ep_end_t);
+        if np.random.uniform(low = 0., high = 1., size = ()) < ep:
+            action_index = tf.constant(np.random.randint(low = 0, high = len(self.legal_actions), size = (1,1)), dtype = tf.int64); # action_index.shape = (1, 1)
+        else:
+            action_index = tf.random.categorical(tf.keras.layers.Softmax(axis = -1)(Qt),1); # action_index.shape = (1, 1)
         reward = 0;
         for i in range(self.STATUS_SIZE):
             reward += self.ale.act(self.legal_actions[action_index]);
@@ -122,6 +133,7 @@ class DQN(object):
         stp1 = self.convertImgToTensor(self.status);
         game_over = 1. if self.ale.game_over() else 0.;
         self.remember((st, action_index, float(reward), stp1, game_over));
+        self.step += 1;
         return game_over;
     
     def train(self, loop_time = 10000000):
