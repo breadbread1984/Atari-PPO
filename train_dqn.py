@@ -42,6 +42,7 @@ class DQN(object):
     UPDATE_FREQUENCY = SCALE;
     STATUS_SIZE = 4;
     GAMMA = 0.99;
+    TEST_INTERVAL = 1000;
     ep_end = 0.1;
     ep_start = 1.;
     ep_end_t = MEMORY_LIMIT;
@@ -66,8 +67,10 @@ class DQN(object):
         self.loss = Loss(len(self.legal_actions), self.GAMMA);
         # status transition memory
         self.memory = list();
-        # step counter
-        self.step = 0;
+        # optimizer
+        self.optimizer = tf.keras.optimizers.Adam(tf.keras.optimizers.schedules.ExponentialDecay(0.00025, 5 * self.SCALE, 0.96));
+        # episode count
+        self.ep_count = 0;
 
     def convertImgToTensor(self,status):
         
@@ -107,7 +110,6 @@ class DQN(object):
             current_frame = self.getObservation();
             self.status.append(current_frame);
             assert False == self.ale.game_over();
-        self.step = 0;
 
     def rollout(self):
         
@@ -120,7 +122,7 @@ class DQN(object):
         # choose action 
         st = self.convertImgToTensor(self.status);
         Qt = self.qnet_target(st); # Qt.shape = (1, action_num)
-        ep = self.ep_end + max(0., (self.ep_start - self.ep_end) * (self.ep_end_t - max(0., self.step - self.learn_start)) / self.ep_end_t);
+        ep = self.ep_end + max(0., (self.ep_start - self.ep_end) * (self.ep_end_t - max(0., self.optimizer.iterations - self.learn_start)) / self.ep_end_t);
         if np.random.uniform(low = 0., high = 1., size = ()) < ep:
             # explore at first
             action_index = tf.constant(np.random.randint(low = 0, high = len(self.legal_actions), size = (1,1)), dtype = tf.int64); # action_index.shape = (1, 1)
@@ -135,20 +137,26 @@ class DQN(object):
         stp1 = self.convertImgToTensor(self.status);
         game_over = 1. if self.ale.game_over() else 0.;
         self.remember((st, action_index, float(reward), stp1, game_over));
-        self.step += 1;
         return game_over;
     
     def train(self, loop_time = 10000000):
-        
-        optimizer = tf.keras.optimizers.Adam(tf.keras.optimizers.schedules.ExponentialDecay(0.00025, 5 * self.SCALE, 0.96));
+
         # setup checkpoint and log utils
-        checkpoint = tf.train.Checkpoint(model = self.qnet_target, optimizer = optimizer, optimizer_step = optimizer.iterations);
+        checkpoint = tf.train.Checkpoint(model = self.qnet_target, optimizer = self.optimizer);
         checkpoint.restore(tf.train.latest_checkpoint('checkpoints_dqn'));
         log = tf.summary.create_file_writer('checkpoints_dqn');
         avg_reward = tf.keras.metrics.Mean(name = 'reward', dtype = tf.float32);
         self.reset_game();
         for i in range(loop_time):
             game_over = self.rollout();
+            if game_over: self.ep_count += 1;
+            if game_over and self.ep_count % TEST_INTERVAL == 0:
+                # evaluate the updated model
+                for i in range(10): avg_reward.update_state(self.eval(steps = 1000));
+                with log.as_default():
+                    tf.summary.scalar('reward', avg_reward.result(), step = self.optimizer.iterations);
+                print('Step #%d Reward: %.6f lr: %.6f' % (self.optimizer.iterations, avg_reward.result(), self.optimizer._hyper['learning_rate'](self.optimizer.iterations)));
+                avg_reward.reset_states();
             # do nothing if collected samples are not enough
             if i < self.BURNIN_STEP or len(self.memory) < self.BATCH_SIZE:
                 continue;
@@ -165,36 +173,24 @@ class DQN(object):
                     loss = self.loss([Qt, Qtp1, rt, at, et]);
                     avg_loss.update_state(loss);
                 # write loss to summary
-                if tf.equal(optimizer.iterations % 100, 0):
+                if tf.equal(self.optimizer.iterations % 100, 0):
                     with log.as_default():
-                        tf.summary.scalar('loss',avg_loss.result(), step = optimizer.iterations);
+                        tf.summary.scalar('loss',avg_loss.result(), step = self.optimizer.iterations);
                     avg_loss.reset_states();
                 # train qnet_latest
                 grads = tape.gradient(loss,self.qnet_latest.trainable_variables);
-                optimizer.apply_gradients(zip(grads,self.qnet_latest.trainable_variables));
+                self.optimizer.apply_gradients(zip(grads,self.qnet_latest.trainable_variables));
             # save model every episode
             if i % self.UPDATE_FREQUENCY == 0:
                 self.qnet_target.set_weights(self.qnet_latest.get_weights());
                 checkpoint.save(os.path.join('checkpoints_dqn','ckpt'));
-                # evaluate the updated model
-                for i in range(10): avg_reward.update_state(self.eval(steps = 1000));
-                with log.as_default():
-                    tf.summary.scalar('reward', avg_reward.result(), step = optimizer.iterations);
-                print('Step #%d Reward: %.6f lr: %.6f' % (optimizer.iterations, avg_reward.result(), optimizer._hyper['learning_rate'](optimizer.iterations)));
-                avg_reward.reset_states();
         # save final model
         if False == os.path.exists('model'): os.mkdir('model');
         #tf.saved_model.save(self.qnet,'./model/vpg_model');
         self.qnet_target.save_weights('./model/dqn_model');
-        
+
     def eval(self, steps = None):
         self.ale.reset_game();
-        status = list();
-        # full initial status
-        for i in range(self.STATUS_SIZE):
-            current_frame = self.getObservation();
-            status.append(current_frame);
-            assert False == self.ale.game_over();
         # play one episode
         total_reward = 0;
         step = 0;
