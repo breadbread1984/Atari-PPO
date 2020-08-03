@@ -35,7 +35,7 @@ class DQN(object):
     
     SHOW = False;
     SCALE = 10000;
-    MEMORY_LIMIT = 100 * SCALE;
+    MEMORY_LIMIT = 4 * SCALE;
     BATCH_SIZE  = 32;
     BURNIN_STEP = 5 * SCALE;
     TRAIN_FREQUENCY = 4;
@@ -190,7 +190,7 @@ class DQN(object):
                 cv2.imshow('screen',self.ale.getScreenRGB());
                 cv2.waitKey(1);
             st = self.convertImgToTensor(status);
-            Qt = self.qnet_target(st);
+            Qt = self.qnet_latest(st);
             action_index = tf.random.categorical(tf.math.exp(Qt),1);
             for i in range(self.STATUS_SIZE):
                 total_reward += self.ale.act(self.legal_actions[action_index]);
